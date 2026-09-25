@@ -26,9 +26,12 @@
 # - ComfyUI Manager
 FROM runpod/worker-comfyui:5.10.0-base
 
+# Install the RunPod Python package if needed
+RUN pip install --no-cache-dir runpod
 
 # Copy the RunPod Serverless handler into the image
 COPY handler.py /handler.py
+COPY workflows /workflows
 
 # ============================================================
 # ComfyUI working directory
