@@ -23,6 +23,8 @@ WORKDIR /comfyui
 # There is NO workflows/ directory.
 # ------------------------------------------------------------
 COPY workflow.json /workflow.json
+COPY extra_model_paths.yaml /comfyui/extra_model_paths.yaml
+
 COPY handler.py /handler.py
 # ------------------------------------------------------------
 # Environment
