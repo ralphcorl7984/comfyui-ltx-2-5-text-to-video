@@ -13,131 +13,110 @@
 
 import json
 import os
-import time
 import uuid
-import urllib.request
-import urllib.parse
+from pathlib import Path
 
 import runpod
 
 
-COMFY_HOST = os.getenv("COMFY_HOST", "127.0.0.1")
-COMFY_PORT = int(os.getenv("COMFY_PORT", "8188"))
-
-COMFY_URL = f"http://{COMFY_HOST}:{COMFY_PORT}"
+WORKFLOW_DIR = Path("/workflows")
 
 
-def queue_prompt(workflow):
+def load_workflow(name):
     """
-    Submit a ComfyUI API workflow.
+    Load an API-format ComfyUI workflow from /workflows.
     """
 
-    client_id = str(uuid.uuid4())
-
-    payload = {
-        "prompt": workflow,
-        "client_id": client_id,
+    workflow_files = {
+        "text_to_video": "LTX-2.5-Text-to-Video-api.json",
+        "image_to_video": "LTX-2.5-Image-to-Video-api.json",
     }
 
-    data = json.dumps(payload).encode("utf-8")
+    if name not in workflow_files:
+        raise ValueError(
+            f"Unknown workflow '{name}'. "
+            f"Available workflows: {list(workflow_files.keys())}"
+        )
 
-    request = urllib.request.Request(
-        f"{COMFY_URL}/prompt",
-        data=data,
-        headers={
-            "Content-Type": "application/json"
-        },
-        method="POST",
-    )
+    path = WORKFLOW_DIR / workflow_files[name]
 
-    with urllib.request.urlopen(request) as response:
-        return json.loads(response.read().decode("utf-8"))
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Workflow file not found: {path}"
+        )
 
-
-def get_history(prompt_id):
-    """
-    Get the ComfyUI execution history.
-    """
-
-    with urllib.request.urlopen(
-        f"{COMFY_URL}/history/{prompt_id}"
-    ) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
-def wait_for_completion(prompt_id, timeout=1800):
-    """
-    Wait until ComfyUI finishes the workflow.
-    """
-
-    start_time = time.time()
-
-    while True:
-
-        if time.time() - start_time > timeout:
-            raise TimeoutError(
-                f"ComfyUI workflow timed out after {timeout} seconds"
-            )
-
-        history = get_history(prompt_id)
-
-        if prompt_id in history:
-            return history[prompt_id]
-
-        time.sleep(2)
+    with path.open("r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def handler(job):
+    """
+    RunPod Serverless handler.
+
+    Expected input:
+
+    {
+        "workflow": "text_to_video",
+        ...
+    }
+
+    or:
+
+    {
+        "workflow": "image_to_video",
+        ...
+    }
+    """
 
     job_input = job.get("input", {})
 
-    workflow = job_input.get("workflow")
+    workflow_name = job_input.get("workflow")
 
-    if workflow is None:
-        return {
-            "status": "error",
-            "error": "Missing 'workflow' in input"
-        }
+    if not workflow_name:
+        raise ValueError(
+            "Missing 'workflow'. "
+            "Use 'text_to_video' or 'image_to_video'."
+        )
 
-    try:
+    workflow = load_workflow(workflow_name)
 
-        # ----------------------------------------------------
-        # Submit workflow to ComfyUI
-        # ----------------------------------------------------
+    # --------------------------------------------------------
+    # Optional:
+    #
+    # If you want to send a complete API workflow directly,
+    # allow the caller to override the saved workflow.
+    # --------------------------------------------------------
 
-        result = queue_prompt(workflow)
+    custom_workflow = job_input.get("workflow_json")
 
-        prompt_id = result.get("prompt_id")
+    if custom_workflow is not None:
 
-        if not prompt_id:
-            return {
-                "status": "error",
-                "error": "ComfyUI did not return a prompt_id",
-                "details": result,
-            }
+        if isinstance(custom_workflow, str):
+            workflow = json.loads(custom_workflow)
 
-        # ----------------------------------------------------
-        # Wait for ComfyUI
-        # ----------------------------------------------------
+        elif isinstance(custom_workflow, dict):
+            workflow = custom_workflow
 
-        history = wait_for_completion(prompt_id)
+        else:
+            raise ValueError(
+                "'workflow_json' must be an object or JSON string"
+            )
 
-        # ----------------------------------------------------
-        # Return ComfyUI result
-        # ----------------------------------------------------
+    # --------------------------------------------------------
+    # Return the workflow.
+    #
+    # IMPORTANT:
+    # The official worker already knows how to submit the
+    # workflow to ComfyUI.
+    #
+    # We return it in the format expected by the worker.
+    # --------------------------------------------------------
 
-        return {
-            "status": "success",
-            "prompt_id": prompt_id,
-            "history": history,
-        }
-
-    except Exception as e:
-
-        return {
-            "status": "error",
-            "error": str(e),
-        }
+    return {
+        "workflow": workflow,
+        "workflow_type": workflow_name,
+        "request_id": str(uuid.uuid4()),
+    }
 
 
 runpod.serverless.start({
