@@ -5,16 +5,27 @@
 
 FROM runpod/worker-comfyui:5.10.0-base
 
-WORKDIR /comfyui
-
-# API workflow
-COPY workflow.json /workflow.json
-
-# Additional ComfyUI model paths
-COPY extra_model_paths.yaml /comfyui/extra_model_paths.yaml
-
-# Serverless handler
-COPY handler.py /handler.py
+# ------------------------------------------------------------
+# Environment
+# ------------------------------------------------------------
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=UTF-8
+
+# ------------------------------------------------------------
+# LTX-2.5 model paths
+#
+# The Network Volume is mounted by RunPod at:
+#
+# /runpod-volume
+#
+# We configure ComfyUI to discover the LTX models there.
+# ------------------------------------------------------------
+
+COPY extra_model_paths.yaml /comfyui/extra_model_paths.yaml
+
+# ------------------------------------------------------------
+# Optional bundled workflow
+# ------------------------------------------------------------
+
+COPY workflow.json /workflow.json
