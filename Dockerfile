@@ -27,6 +27,9 @@
 FROM runpod/worker-comfyui:5.10.0-base
 
 
+# Copy the RunPod Serverless handler into the image
+COPY handler.py /handler.py
+
 # ============================================================
 # ComfyUI working directory
 # ============================================================
