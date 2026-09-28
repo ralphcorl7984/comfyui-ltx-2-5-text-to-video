@@ -13,6 +13,3 @@ COPY extra_model_paths.yaml /comfyui/extra_model_paths.yaml
 
 # API workflow bundled into the image
 COPY api-workflow.json /api-workflow.json
-
-# Optional UI workflow
-COPY workflow.json /workflow.json
