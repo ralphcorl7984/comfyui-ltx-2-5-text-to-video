@@ -298,30 +298,45 @@ def wait_for_result(prompt_id):
 # ============================================================
 # Extract generated files
 # ============================================================
-
 def extract_outputs(result):
 
     outputs = []
 
-    for node_id, node_output in result.get(
-        "outputs",
-        {}
-    ).items():
+    comfy_outputs = result.get("outputs", {})
+
+    logger.info(
+        f"ComfyUI output nodes: {list(comfy_outputs.keys())}"
+    )
+
+    for node_id, node_output in comfy_outputs.items():
+
+        logger.info(
+            f"Output from node {node_id}: {node_output}"
+        )
 
         if not isinstance(node_output, dict):
             continue
 
+        # ----------------------------------------------------
+        # Standard ComfyUI image/video/audio outputs
+        # ----------------------------------------------------
+
         for key in (
             "videos",
+            "video",
             "gifs",
             "images",
             "audio",
+            "files",
         ):
 
-            items = node_output.get(key, [])
+            items = node_output.get(key)
+
+            if not items:
+                continue
 
             if not isinstance(items, list):
-                continue
+                items = [items]
 
             for item in items:
 
@@ -333,8 +348,46 @@ def extract_outputs(result):
                         **item,
                     })
 
-    return outputs
+                elif isinstance(item, str):
 
+                    outputs.append({
+                        "node": node_id,
+                        "type": key,
+                        "filename": item,
+                    })
+
+        # ----------------------------------------------------
+        # SaveVideo-specific output structures
+        # ----------------------------------------------------
+
+        if "gifs" in node_output:
+
+            for item in node_output["gifs"]:
+
+                if isinstance(item, dict):
+
+                    outputs.append({
+                        "node": node_id,
+                        "type": "video",
+                        **item,
+                    })
+
+        # ----------------------------------------------------
+        # Catch any unknown output structure
+        # ----------------------------------------------------
+
+        if not any(
+            output["node"] == node_id
+            for output in outputs
+        ):
+
+            outputs.append({
+                "node": node_id,
+                "type": "raw",
+                "data": node_output,
+            })
+
+    return outputs
 
 # ============================================================
 # RunPod handler
