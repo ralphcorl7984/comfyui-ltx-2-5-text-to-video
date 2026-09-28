@@ -543,14 +543,17 @@ def handler(job):
     # --------------------------------------------------------
     # Return
     # --------------------------------------------------------
+return {
+    "status": "success",
+    "prompt_id": prompt_id,
+    "duration": duration,
+    "resolution": resolution,
+    "outputs": outputs,
 
-    return {
-        "status": "success",
-        "prompt_id": prompt_id,
-        "duration": duration,
-        "resolution": resolution,
-        "outputs": outputs,
-    }
+    # Temporary diagnostic information
+    "comfy_outputs": result.get("outputs", {}),
+}
+
 
 
 # ============================================================
